@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 ggez = "0.6.0-rc1"
+bitvector = "0.1"
