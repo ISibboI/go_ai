@@ -1,0 +1,8 @@
+[package]
+name = "go_ai"
+version = "0.1.0"
+authors = ["Sebastian Schmidt <isibboi@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+ggez = "0.6.0-rc1"
