@@ -7,3 +7,5 @@ edition = "2018"
 [dependencies]
 ggez = "0.6.0-rc1"
 bitvector = "0.1"
+rand = "0.8"
+rand_pcg = "0.3"

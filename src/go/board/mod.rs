@@ -30,6 +30,17 @@ impl GoBoardMask {
         Self {mask: BitVector::new(9 * 9)}
     }
 
+    pub fn new_stone_mask(board: &GoBoard, color : GoStone) -> Self {
+        let mut result = Self::new();
+        for x in 0..9 {
+            for y in 0..9 {
+                let coordinates = GoCoordinates::new(x, y);
+                result.set(coordinates, board.get_stone(coordinates) == color);
+            }
+        }
+        result
+    }
+
     pub fn get(&self, c: GoCoordinates) -> bool {
         self.mask.contains(c.into())
     }
@@ -125,6 +136,94 @@ impl GoBoard {
 
         result
     }
+
+    pub fn voronoi_score(&self) -> (u64, u64) {
+        let mut grow = self.clone();
+
+        loop {
+            let grew = grow.grow_both();
+
+            if !grew {
+                break;
+            }
+        }
+
+        (grow.count(GoStone::BLACK).into(), grow.count(GoStone::WHITE).into())
+    }
+
+    pub fn grow_both(&mut self) -> bool {
+        let mask = GoBoardMask::new_stone_mask(self, GoStone::NONE);
+        let mut has_grown = false;
+
+        for x in 0..9 {
+            for y in 0..9 {
+                let coordinates = GoCoordinates::new(x, y);
+                if !self.get_stone(coordinates).is_none() {
+                    continue;
+                }
+
+                let mut grow_black = false;
+                let mut grow_white = false;
+                for neighbor in coordinates.neighbors() {
+                    if mask.get(neighbor) {
+                        continue;
+                    }
+                    let neighbor_stone = self.get_stone(neighbor);
+
+                    if neighbor_stone == GoStone::BLACK {
+                        grow_black = true;
+                    }
+                    if neighbor_stone == GoStone::WHITE {
+                        grow_white = true;
+                    }
+                }
+
+                if grow_black && !grow_white {
+                    self.set_stone(coordinates, GoStone::BLACK);
+                    has_grown = true;
+                } else if !grow_black && grow_white {
+                    self.set_stone(coordinates, GoStone::WHITE);
+                    has_grown = true;
+                }
+            }
+        }
+
+        has_grown
+    }
+
+    pub fn grow(&mut self, color: GoStone) -> bool {
+        let mask = GoBoardMask::new_stone_mask(self, color);
+        let mut has_grown = false;
+
+        for x in 0..9 {
+            for y in 0..9 {
+                let coordinates = GoCoordinates::new(x, y);
+                if self.get_stone(coordinates) == color {
+                    continue;
+                }
+
+                if coordinates.neighbors().iter().filter(|&&c| mask.get(c)).next().is_some() {
+                    self.set_stone(coordinates, color);
+                    has_grown = true;
+                }
+            }
+        }
+
+        has_grown
+    }
+
+    pub fn count(&self, color: GoStone) -> u8 {
+        let mut result = 0;
+        for x in 0..9 {
+            for y in 0..9 {
+                let coordinates = GoCoordinates::new(x, y);
+                if self.get_stone(coordinates) == color {
+                    result += 1;
+                }
+            }
+        }
+        result
+    }
 }
 
 
@@ -156,6 +255,14 @@ impl GoCoordinates {
             result.push(GoCoordinates {x: self.x, y: self.y + 1});
         }
         result
+    }
+
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn y(&self) -> u8 {
+        self.y
     }
 }
 

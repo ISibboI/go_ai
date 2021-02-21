@@ -2,6 +2,7 @@ use ggez::{Context, ContextBuilder, GameResult};
 use ggez::event::{self, EventHandler, MouseButton};
 use ggez::graphics;
 use go::GoGame;
+use go::ai::{GoAI, voronoi_ai::VoronoiAI};
 use go::board::{GoStone, GoCoordinates};
 use ui::button::Button;
 use ui::label::Label;
@@ -29,7 +30,7 @@ fn main() {
     // Create an instance of your event handler.
     // Usually, you should provide it with the Context object
     // so it can load resources like images during setup.
-    let my_game = MyGame::new(&mut ctx);
+    let my_game = MyGame::new(&mut ctx, VoronoiAI::new());
 
     // Run!
     /*match event::run(ctx, event_loop, my_game) {
@@ -40,7 +41,7 @@ fn main() {
     event::run(ctx, event_loop, my_game)
 }
 
-struct MyGame {
+struct MyGame<AI> {
     grid: [f32; 9],
     grid_box_len: f32,
     game: GoGame,
@@ -49,10 +50,11 @@ struct MyGame {
     undo_button: Button,
     black_captures_label: Label,
     white_captures_label: Label,
+    ai: AI,
 }
 
-impl MyGame {
-    pub fn new(_ctx: &mut Context) -> MyGame {
+impl<AI: GoAI> MyGame<AI> {
+    pub fn new(_ctx: &mut Context, mut ai: AI) -> Self {
         // Load/create resources here: images, fonts, sounds, etc.
         let mut grid = [0.0; 9];
 
@@ -66,11 +68,14 @@ impl MyGame {
         let black_captures_label = Label::new("Black captures: 0", [610.0, 30.0].into());
         let white_captures_label = Label::new("White captures: 0", [610.0, 50.0].into());
 
-        MyGame { grid, grid_box_len, game: GoGame::new(), mouse_x: -1.0, mouse_y: -1.0, undo_button, black_captures_label, white_captures_label }
+        let game = GoGame::new();
+        ai.set_game(game.clone());
+
+        MyGame { grid, grid_box_len, game, mouse_x: -1.0, mouse_y: -1.0, undo_button, black_captures_label, white_captures_label, ai }
     }
 }
 
-impl EventHandler for MyGame {
+impl<AI: GoAI> EventHandler for MyGame<AI> {
     fn mouse_motion_event(
         &mut self,
         _ctx: &mut Context,
@@ -90,12 +95,12 @@ impl EventHandler for MyGame {
         x: f32,
         y: f32
     ) {
-        if button == MouseButton::Left && x >= 0.0 && y >= 0.0 && x <= self.grid_box_len * 9.0 && y <= self.grid_box_len * 9.0 {
+        if button == MouseButton::Left && x >= 0.0 && y >= 0.0 && x <= self.grid_box_len * 9.0 && y <= self.grid_box_len * 9.0 && self.game.current_turn() == GoStone::BLACK {
             let x = ((x / self.grid_box_len).max(0.0) as usize).min(8);
             let y = ((y / self.grid_box_len).max(0.0) as usize).min(8);
             match self.game.play_stone(GoCoordinates::new_usize(x, y)) {
-                Ok(_) => {}
-                Err(_) => println!("Could not play stone")
+                Ok(_) => self.ai.set_game(self.game.clone()),
+                Err(_) => println!("Could not play stone"),
             }
         }
 
@@ -104,7 +109,19 @@ impl EventHandler for MyGame {
 
     fn update(&mut self, _ctx: &mut Context) -> GameResult<()> {
         if self.undo_button.consume_was_clicked() {
-            self.game.undo().unwrap_or_else(|()| println!("Could not undo"));
+            match self.game.undo() {
+                Ok(_) => self.ai.set_game(self.game.clone()),
+                Err(_) => println!("Could not undo"),
+            }
+        }
+
+        if self.game.current_turn() == GoStone::WHITE {
+            if let Some(coordinates) = self.ai.best_move() {
+                match self.game.play_stone(coordinates) {
+                    Ok(_) => self.ai.set_game(self.game.clone()),
+                    Err(_) => println!("AI move {}, {} is invalid", coordinates.x(), coordinates.y()),
+                }
+            }
         }
 
         self.black_captures_label.set_text(&format!("Black captures: {}", self.game.black_captures()));

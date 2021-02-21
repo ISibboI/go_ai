@@ -1,6 +1,7 @@
 use board::{GoStone, GoCoordinates, GoBoard};
 
 pub mod board;
+pub mod ai;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GoGame {
@@ -14,6 +15,17 @@ impl GoGame {
     pub fn new() -> Self {
         let board = GoBoard::new();
         Self { board: vec![board], turn: 0, black_captures: 0, white_captures: 0 }
+    }
+
+    pub fn from_board(board: GoBoard, current_turn: GoStone) -> Self {
+        assert!(!current_turn.is_none());
+
+        Self {
+            board: vec![board],
+            turn: if current_turn == GoStone::BLACK {0} else {1},
+            black_captures: 0,
+            white_captures: 0,
+        }
     }
 
     pub fn play_stone(&mut self, coordinates: GoCoordinates) -> Result<(), ()> {
